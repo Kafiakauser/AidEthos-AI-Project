@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>AidEthos — Sign Up</title>
+  <link rel="stylesheet" href="static/css/style.css"/>
+</head>
+<body>
+<nav class="navbar">
+  <div class="container">
+    <a href="index.html" class="nav-logo">
+      <img src="static/images/logo.png" alt="AidEthos" onerror="this.style.display='none';document.getElementById('lt').style.display='block'"/>
+      <span id="lt" class="nav-logo-text" style="display:none;">AidEthos</span>
+    </a>
+    <div class="nav-right"><a href="index.html" class="btn btn-ghost btn-sm">Back to Home</a></div>
+  </div>
+</nav>
+
+<div class="auth-page">
+  <div class="auth-card fu" style="max-width:500px;">
+    <h1>Create Account</h1>
+    <p class="auth-sub">Join AidEthos to make a difference</p>
+
+    <div class="radio-group" style="margin-bottom:22px;">
+      <label class="radio-label selected" id="lbl-ngo" onclick="setRole('ngo')"><input type="radio" name="role" value="ngo" checked id="r-ngo"/> NGO</label>
+      <label class="radio-label" id="lbl-vol" onclick="setRole('volunteer')"><input type="radio" name="role" value="volunteer" id="r-vol"/> Volunteer</label>
+    </div>
+
+    <div id="signup-alert"></div>
+
+    <!-- NGO form -->
+    <form class="auth-form" id="ngo-form" novalidate>
+      <div class="form-group"><label class="form-label">Organization Name</label><input class="form-input" type="text" id="ngo-name" placeholder="HelpingHand Foundation" required/></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Phone</label><input class="form-input" type="tel" id="ngo-phone" placeholder="+91 40 2345 6789"/></div>
+        <div class="form-group"><label class="form-label">Email</label><input class="form-input" type="email" id="ngo-email" placeholder="contact@ngo.org" required/></div>
+      </div>
+      <div class="form-group"><label class="form-label">Password</label><input class="form-input" type="password" id="ngo-password" placeholder="Create a password" required/></div>
+      <div class="form-group"><label class="form-label">Location</label><input class="form-input" type="text" id="ngo-location" placeholder="Hyderabad, Telangana"/></div>
+      <div class="form-group"><label class="form-label">Volunteer Needs</label><textarea class="form-textarea" id="ngo-needs" rows="3" placeholder="Describe what volunteers you typically need..."></textarea></div>
+      <button type="submit" class="btn btn-teal btn-full btn-lg" id="btn-ngo">Create NGO Account</button>
+    </form>
+
+    <!-- Volunteer form -->
+    <form class="auth-form" id="vol-form" novalidate style="display:none;">
+      <div class="form-group"><label class="form-label">Full Name</label><input class="form-input" type="text" id="vol-name" placeholder="Your full name" required/></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Phone</label><input class="form-input" type="tel" id="vol-phone" placeholder="+91 98765 43210"/></div>
+        <div class="form-group"><label class="form-label">Email</label><input class="form-input" type="email" id="vol-email" placeholder="you@email.com"/></div>
+      </div>
+      <div class="form-group"><label class="form-label">Password</label><input class="form-input" type="password" id="vol-password" placeholder="Create a password" required/></div>
+      <div class="form-group"><label class="form-label">Location</label><input class="form-input" type="text" id="vol-location" placeholder="Hyderabad, Telangana"/></div>
+      <div class="form-group"><label class="form-label">Skills</label><textarea class="form-textarea" id="vol-skills" rows="3" placeholder="First Aid, Data Analysis, Teaching..." required></textarea><span class="form-hint">Comma-separated for best AI matching.</span></div>
+      <button type="submit" class="btn btn-teal btn-full btn-lg" id="btn-vol">Create Volunteer Account</button>
+    </form>
+
+    <div class="divider"></div>
+    <div class="auth-switch">Already have an account? <a href="login.html">Log In</a></div>
+  </div>
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+<script>
+const API='http://127.0.0.1:8000';
+const params=new URLSearchParams(window.location.search);
+let role=params.get('role')||'ngo';
+setRole(role);
+
+function setRole(r){
+  role=r;
+  document.getElementById('ngo-form').style.display=r==='ngo'?'':'none';
+  document.getElementById('vol-form').style.display=r==='volunteer'?'':'none';
+  document.getElementById('lbl-ngo').classList.toggle('selected',r==='ngo');
+  document.getElementById('lbl-vol').classList.toggle('selected',r==='volunteer');
+  document.getElementById(r==='ngo'?'r-ngo':'r-vol').checked=true;
+}
+
+function showToast(msg,type='default'){
+  const c=document.getElementById('toast-container');
+  const t=document.createElement('div');t.className=`toast ${type}`;t.textContent=msg;c.appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},3500);
+}
+
+document.getElementById('ngo-form').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const btn=document.getElementById('btn-ngo');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>&nbsp;Creating account...';
+  document.getElementById('signup-alert').innerHTML='';
+  const payload={org_name:document.getElementById('ngo-name').value.trim(),phone:document.getElementById('ngo-phone').value.trim(),email:document.getElementById('ngo-email').value.trim(),password:document.getElementById('ngo-password').value,location:document.getElementById('ngo-location').value.trim(),volunteer_needs:document.getElementById('ngo-needs').value.trim()};
+  if (!payload.org_name||!payload.email||!payload.password){document.getElementById('signup-alert').innerHTML='<div class="alert alert-error">Please fill in all required fields.</div>';btn.disabled=false;btn.textContent='Create NGO Account';return;}
+  try {
+    const res=await fetch(`${API}/ngo/register`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const data=await res.json();
+    if (!res.ok) throw new Error(data.detail||'Registration failed');
+    localStorage.setItem('aidethos_ngo',JSON.stringify(data));
+    showToast('Account created! Redirecting...','success');
+    setTimeout(()=>window.location.href='ngo-dashboard.html',900);
+  } catch(err){document.getElementById('signup-alert').innerHTML=`<div class="alert alert-error">${err.message}</div>`;btn.disabled=false;btn.textContent='Create NGO Account';}
+});
+
+document.getElementById('vol-form').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const btn=document.getElementById('btn-vol');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>&nbsp;Creating account...';
+  document.getElementById('signup-alert').innerHTML='';
+  const payload={name:document.getElementById('vol-name').value.trim(),phone:document.getElementById('vol-phone').value.trim(),email:document.getElementById('vol-email').value.trim(),password:document.getElementById('vol-password').value,location:document.getElementById('vol-location').value.trim(),skills:document.getElementById('vol-skills').value.trim()};
+  if (!payload.name||!payload.skills||!payload.password){document.getElementById('signup-alert').innerHTML='<div class="alert alert-error">Please fill in all required fields.</div>';btn.disabled=false;btn.textContent='Create Volunteer Account';return;}
+  try {
+    const res=await fetch(`${API}/volunteer/register`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const data=await res.json();
+    if (!res.ok) throw new Error(data.detail||'Registration failed');
+    localStorage.setItem('aidethos_vol',JSON.stringify(data));
+    showToast('Account created! Redirecting...','success');
+    setTimeout(()=>window.location.href='vol-dashboard.html',900);
+  } catch(err){document.getElementById('signup-alert').innerHTML=`<div class="alert alert-error">${err.message}</div>`;btn.disabled=false;btn.textContent='Create Volunteer Account';}
+});
+</script>
+</body>
+</html>

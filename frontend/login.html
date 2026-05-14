@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>AidEthos — Login</title>
+  <link rel="stylesheet" href="static/css/style.css"/>
+</head>
+<body>
+<nav class="navbar">
+  <div class="container">
+    <a href="index.html" class="nav-logo">
+      <img src="static/images/logo.png" alt="AidEthos" onerror="this.style.display='none';document.getElementById('lt').style.display='block'"/>
+      <span id="lt" class="nav-logo-text" style="display:none;">AidEthos</span>
+    </a>
+    <div class="nav-right"><a href="index.html" class="btn btn-ghost btn-sm">Back to Home</a></div>
+  </div>
+</nav>
+
+<div class="auth-page">
+  <div class="auth-card fu">
+    <h1>Login to AidEthos</h1>
+    <p class="auth-sub">Sign in to manage your crises and volunteers</p>
+
+    <div class="radio-group" style="margin-bottom:20px;">
+      <label class="radio-label selected" id="lbl-ngo" onclick="setRole('ngo')"><input type="radio" name="role" value="ngo" checked/> NGO</label>
+      <label class="radio-label" id="lbl-vol" onclick="setRole('volunteer')"><input type="radio" name="role" value="volunteer"/> Volunteer</label>
+    </div>
+
+    <div id="login-alert"></div>
+    <form class="auth-form" id="login-form" novalidate>
+      <div class="form-group"><label class="form-label">Email</label><input class="form-input" type="email" id="email" placeholder="you@organization.org" required/></div>
+      <div class="form-group"><label class="form-label">Password</label><input class="form-input" type="password" id="password" placeholder="Enter your password" required/></div>
+      <button type="submit" class="btn btn-teal btn-full btn-lg" id="btn-login" style="margin-top:4px;">Login</button>
+    </form>
+    <div class="divider"></div>
+    <div class="auth-switch">Don't have an account? <a href="signup.html">Sign Up</a></div>
+  </div>
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+<script>
+const API='http://127.0.0.1:8000';
+const session=JSON.parse(localStorage.getItem('aidethos_ngo')||'null');
+if (session?.id) window.location.href='ngo-dashboard.html';
+const volSession=JSON.parse(localStorage.getItem('aidethos_vol')||'null');
+if (volSession?.id) window.location.href='vol-dashboard.html';
+
+let role='ngo';
+function setRole(r){
+  role=r;
+  document.getElementById('lbl-ngo').classList.toggle('selected',r==='ngo');
+  document.getElementById('lbl-vol').classList.toggle('selected',r==='volunteer');
+}
+
+document.getElementById('login-form').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const btn=document.getElementById('btn-login');
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span>&nbsp;Logging in...';
+  document.getElementById('login-alert').innerHTML='';
+  const email=document.getElementById('email').value.trim();
+  const password=document.getElementById('password').value;
+  if (!email||!password){document.getElementById('login-alert').innerHTML='<div class="alert alert-error">Please fill in all fields.</div>';btn.disabled=false;btn.textContent='Login';return;}
+  try {
+    const endpoint = role==='ngo' ? `${API}/ngo/login` : `${API}/volunteer/login`;
+    const res=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});
+    const data=await res.json();
+    if (!res.ok) throw new Error(data.detail||'Login failed');
+    if (role==='ngo'){
+      localStorage.setItem('aidethos_ngo',JSON.stringify(data));
+      window.location.href='ngo-dashboard.html';
+    } else {
+      localStorage.setItem('aidethos_vol',JSON.stringify(data));
+      window.location.href='vol-dashboard.html';
+    }
+  } catch(err){
+    document.getElementById('login-alert').innerHTML=`<div class="alert alert-error">${err.message}</div>`;
+    btn.disabled=false; btn.textContent='Login';
+  }
+});
+</script>
+</body>
+</html>

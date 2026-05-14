@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>AidEthos — NGO Dashboard</title>
+  <link rel="stylesheet" href="static/css/style.css"/>
+</head>
+<body>
+<nav class="navbar">
+  <div class="container">
+    <a href="index.html" class="nav-logo">
+      <img src="static/images/logo.png" alt="AidEthos" onerror="this.style.display='none';document.getElementById('lt').style.display='block'"/>
+      <span id="lt" class="nav-logo-text" style="display:none;">AidEthos</span>
+    </a>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="ngo-dashboard.html" class="active">Dashboard</a>
+    </div>
+    <div class="nav-right">
+      <div class="nav-profile" id="nav-avatar">?</div>
+      <button class="btn btn-ghost btn-sm" id="btn-logout">Log Out</button>
+    </div>
+  </div>
+</nav>
+
+<div class="container ngo-dash">
+  <!-- Header -->
+  <div class="ngo-dash-header fu">
+    <div>
+      <h1 id="org-name">—</h1>
+      <p>NGO Dashboard</p>
+    </div>
+    <a href="ngo-post.html" class="btn btn-teal">+ New Crisis</a>
+  </div>
+
+  <div class="ngo-dash-grid">
+    <!-- LEFT -->
+    <div class="ngo-main">
+
+      <!-- Active Crises -->
+      <div class="section-head">
+        <h3>Your Active Crises</h3>
+        <a href="ngo-post.html" class="btn btn-teal-outline btn-sm">+ New Crisis</a>
+      </div>
+
+      <div id="crises-loader" class="loader"><div class="spinner spinner-teal"></div>&nbsp;Loading your crises...</div>
+      <div id="crises-error" class="alert alert-error" style="display:none;"></div>
+      <div id="crises-list"></div>
+      <div id="crises-empty" class="empty-state" style="display:none;">
+        <h3>No crises posted yet</h3>
+        <p>Post your first crisis to start receiving volunteer applications.</p>
+        <a href="ngo-post.html" class="btn btn-teal btn-sm" style="margin-top:4px;">Post a Crisis</a>
+      </div>
+
+      <!-- Registered Volunteers -->
+      <div class="section-head" style="margin-top:28px;">
+        <h3>Registered Volunteers</h3>
+        <span id="vol-count-badge" class="badge badge-teal">0 volunteers</span>
+      </div>
+      <div class="vol-list-card">
+        <p class="vol-list-sub" id="vol-count-sub">Loading volunteers...</p>
+        <div id="vol-loader" class="loader" style="padding:16px;"><div class="spinner spinner-teal"></div></div>
+        <div id="vol-list"></div>
+        <div id="vol-empty" class="empty-state" style="display:none;padding:24px;">
+          <h3>No volunteers yet</h3>
+          <p>Volunteers appear here when they register for your crises.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT sidebar -->
+    <div class="ngo-side">
+      <!-- Progress -->
+      <div class="progress-card fu d1">
+        <h4>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Volunteer Progress
+        </h4>
+        <div class="progress-label">
+          <span>Registered</span>
+          <span id="prog-count">0 / 50</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+        <p class="progress-note" id="prog-note">Loading...</p>
+      </div>
+
+      <!-- Credibility -->
+      <div class="cred-card fu d2">
+        <h4>Credibility Score</h4>
+        <div class="cred-score-row">
+          <div class="cred-num" id="cred-score">5.0</div>
+          <div class="cred-info">
+            <div class="cred-stars" id="cred-stars">★★★☆☆</div>
+            <div class="cred-level" id="cred-level">Building Trust</div>
+          </div>
+        </div>
+        <div class="cred-stats">
+          <div class="cred-stat"><div class="cred-stat-num" id="stat-crises">0</div><div class="cred-stat-label">Crises Posted</div></div>
+          <div class="cred-stat"><div class="cred-stat-num" id="stat-vols">0</div><div class="cred-stat-label">Total Volunteers</div></div>
+        </div>
+      </div>
+
+      <!-- Quick actions -->
+      <div class="card fu d3" style="padding:16px;">
+        <h4 style="margin-bottom:12px;">Quick Actions</h4>
+        <a href="ngo-post.html" class="btn btn-teal btn-full btn-sm" style="margin-bottom:8px;">Post New Crisis</a>
+        <button class="btn btn-ghost btn-full btn-sm" onclick="downloadCSV()">Download Volunteer List</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- View Responses Modal -->
+<div class="modal-overlay" id="resp-modal">
+  <div class="modal" style="max-width:540px;">
+    <div class="modal-head">
+      <div><h3 id="resp-title">Volunteer Responses</h3><p style="font-size:.78rem;color:var(--gray-500);margin-top:3px;">AI-ranked by skill match score</p></div>
+      <button class="modal-close" id="resp-close">x</button>
+    </div>
+    <div id="resp-loader" class="loader"><div class="spinner spinner-teal"></div></div>
+    <div id="resp-list"></div>
+    <div id="resp-empty" class="empty-state" style="display:none;padding:20px;">
+      <h3>No responses yet</h3>
+      <p>Volunteers will appear here when they register for this crisis.</p>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+
+<script>
+const API='http://127.0.0.1:8000';
+const ngo=JSON.parse(localStorage.getItem('aidethos_ngo')||'null');
+if (!ngo?.id) window.location.href='login.html';
+
+document.getElementById('org-name').textContent=ngo.org_name;
+document.getElementById('nav-avatar').textContent=(ngo.org_name||'N').slice(0,2).toUpperCase();
+
+function esc(s){const d=document.createElement('div');d.appendChild(document.createTextNode(String(s||'')));return d.innerHTML;}
+function urgencyClass(l){return l>=8?'high':l>=5?'medium':'low';}
+function urgencyLabel(l){return l>=8?'High Urgency':l>=5?'Medium Urgency':'Low Urgency';}
+function showToast(msg,type='default'){
+  const c=document.getElementById('toast-container');
+  const t=document.createElement('div');t.className=`toast ${type}`;t.textContent=msg;c.appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},3500);
+}
+
+async function init(){
+  await Promise.all([loadCrises(),loadVolunteers()]);
+}
+
+async function loadCrises(){
+  try {
+    const res=await fetch(`${API}/ngo/${ngo.id}/crises`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const crises=await res.json();
+    document.getElementById('crises-loader').style.display='none';
+    document.getElementById('stat-crises').textContent=crises.length;
+    if (!crises.length){document.getElementById('crises-empty').style.display='';updateCredibility();return;}
+    renderCrises(crises);
+    updateCredibility();
+  } catch(err){
+    document.getElementById('crises-loader').style.display='none';
+    document.getElementById('crises-error').textContent=`Could not load crises: ${err.message}`;
+    document.getElementById('crises-error').style.display='';
+  }
+}
+
+function renderCrises(crises){
+  document.getElementById('crises-list').innerHTML=crises.map(c=>{
+    const cls=urgencyClass(c.urgency_level);
+    const tags=(c.required_skills||'').split(',').map(s=>`<span class="skill-tag">${esc(s.trim())}</span>`).join('');
+    return `
+    <div class="ngo-crisis-card ${cls} fu">
+      <div class="ncc-head">
+        <div class="ncc-title">${esc(c.title)}</div>
+        <span class="urgency-badge ${cls}">${urgencyLabel(c.urgency_level)}</span>
+      </div>
+      <div class="ncc-meta"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${esc(c.location||'Hyderabad')}</div>
+      <div class="ncc-skills-label">Volunteer skills needed</div>
+      <div class="ncc-skills">${tags}</div>
+      <div class="ncc-desc">${esc((c.description||'').slice(0,160))}${(c.description||'').length>160?'...':''}</div>
+      <div class="ncc-contact">
+        <span><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.28h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.96a16 16 0 0 0 6 6l.66-.66a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.28 16.92z"/></svg>${esc(c.contact_phone||ngo.phone||'—')}</span>
+        <span><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>${esc(c.contact_email||ngo.email||'—')}</span>
+      </div>
+      <div class="ncc-responses" id="resp-count-${c.id}">Responses: loading...</div>
+      <div class="ncc-actions">
+        <button class="btn btn-teal btn-sm" onclick="viewResponses(${c.id},'${esc(c.title).replace(/'/g,"\\'")}')">View responses</button>
+        <a href="ngo-post.html?edit=${c.id}" class="btn btn-ghost btn-sm">Edit</a>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Load response counts per crisis
+  crises.forEach(async c=>{
+    try {
+      const r=await fetch(`${API}/crises/${c.id}/volunteers`);
+      const v=await r.json();
+      const el=document.getElementById(`resp-count-${c.id}`);
+      if(el) el.textContent=`Responses: ${v.length} Volunteer${v.length!==1?'s':''}`;
+    } catch {}
+  });
+}
+
+async function loadVolunteers(){
+  try {
+    const res=await fetch(`${API}/ngo/${ngo.id}/volunteers`);
+    const vols=await res.json();
+    document.getElementById('vol-loader').style.display='none';
+    document.getElementById('stat-vols').textContent=vols.length;
+    document.getElementById('vol-count-badge').textContent=`${vols.length} volunteer${vols.length!==1?'s':''}`;
+    document.getElementById('vol-count-sub').textContent=`${vols.length} volunteer${vols.length!==1?'s':''} have signed up`;
+
+    const target=Math.max(vols.length+22,50);
+    document.getElementById('prog-count').textContent=`${vols.length} / ${target}`;
+    document.getElementById('prog-fill').style.width=Math.min(100,Math.round(vols.length/target*100))+'%';
+    document.getElementById('prog-note').textContent=`${Math.max(0,target-vols.length)} more volunteers needed`;
+
+    if (!vols.length){document.getElementById('vol-empty').style.display='';return;}
+    document.getElementById('vol-list').innerHTML=vols.map(v=>`
+      <div class="vol-row">
+        <div class="vol-info">
+          <div class="vol-name">${esc(v.name)}</div>
+          <div class="vol-skills-text">${esc(v.skills)}</div>
+        </div>
+        <div class="vol-actions-row">
+          <button class="icon-btn" title="Email" onclick="showToast('Email: ${esc(v.email||'N/A')}')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          </button>
+          <button class="icon-btn" title="Phone" onclick="showToast('Phone: ${esc(v.phone||'N/A')}')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.28h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.96a16 16 0 0 0 6 6l.66-.66a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.28 16.92z"/></svg>
+          </button>
+        </div>
+      </div>`).join('');
+  } catch {
+    document.getElementById('vol-loader').style.display='none';
+    document.getElementById('vol-empty').style.display='';
+  }
+}
+
+function updateCredibility(){
+  const crises=parseInt(document.getElementById('stat-crises').textContent)||0;
+  const vols=parseInt(document.getElementById('stat-vols').textContent)||0;
+  let score=Math.min(10,5+(crises*0.5)+(vols*0.08)+((ngo.id%10)*0.05));
+  score=parseFloat(score.toFixed(1));
+  const stars='★'.repeat(Math.round(score/2))+'☆'.repeat(5-Math.round(score/2));
+  const level=score>=8?'Highly Trusted':score>=6?'Trusted':'Building Trust';
+  document.getElementById('cred-score').textContent=score+'/10';
+  document.getElementById('cred-stars').textContent=stars;
+  document.getElementById('cred-level').textContent=level;
+}
+
+window.viewResponses=async function(crisisId,title){
+  document.getElementById('resp-title').textContent=title;
+  document.getElementById('resp-modal').classList.add('open');
+  document.getElementById('resp-loader').style.display='flex';
+  document.getElementById('resp-list').innerHTML='';
+  document.getElementById('resp-empty').style.display='none';
+  try {
+    const res=await fetch(`${API}/crises/${crisisId}/volunteers`);
+    const vols=await res.json();
+    document.getElementById('resp-loader').style.display='none';
+    if (!vols.length){document.getElementById('resp-empty').style.display='';return;}
+    document.getElementById('resp-list').innerHTML=vols.map(v=>{
+      const pct=v.match_score!=null?Math.round(v.match_score*100):null;
+      return `<div class="vol-row">
+        <div style="width:34px;height:34px;border-radius:50%;background:var(--teal);color:white;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;flex-shrink:0;">${(v.name||'V').slice(0,2).toUpperCase()}</div>
+        <div class="vol-info">
+          <div class="vol-name">${esc(v.name)}</div>
+          <div class="vol-skills-text">${esc(v.skills)}</div>
+        </div>
+        ${pct!==null?`<span class="match-badge">${pct}% Match</span>`:''}
+        <div class="vol-actions-row">
+          <button class="icon-btn" onclick="showToast('Phone: ${esc(v.phone||'N/A')}')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.28h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.96a16 16 0 0 0 6 6l.66-.66a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.28 16.92z"/></svg>
+          </button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch {
+    document.getElementById('resp-loader').style.display='none';
+    document.getElementById('resp-empty').style.display='';
+  }
+};
+
+document.getElementById('resp-close').addEventListener('click',()=>document.getElementById('resp-modal').classList.remove('open'));
+document.getElementById('resp-modal').addEventListener('click',e=>{if(e.target===document.getElementById('resp-modal'))document.getElementById('resp-modal').classList.remove('open');});
+document.getElementById('btn-logout').addEventListener('click',()=>{localStorage.removeItem('aidethos_ngo');window.location.href='index.html';});
+window.downloadCSV=()=>{
+  const rows=document.querySelectorAll('.vol-row');
+  if(!rows.length){showToast('No volunteers to download.');return;}
+  const names=[...rows].map(r=>r.querySelector('.vol-name')?.textContent||'');
+  const skills=[...rows].map(r=>r.querySelector('.vol-skills-text')?.textContent||'');
+  const csv='Name,Skills\n'+names.map((n,i)=>`"${n}","${skills[i]}"`).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='volunteers.csv';a.click();
+  showToast('Volunteer list downloaded.','success');
+};
+
+init();
+</script>
+</body>
+</html>

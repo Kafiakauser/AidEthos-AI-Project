@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>AidEthos — Post a Crisis</title>
+  <link rel="stylesheet" href="static/css/style.css"/>
+</head>
+<body>
+<nav class="navbar">
+  <div class="container">
+    <a href="index.html" class="nav-logo">
+      <img src="static/images/logo.png" alt="AidEthos" onerror="this.style.display='none';document.getElementById('lt').style.display='block'"/>
+      <span id="lt" class="nav-logo-text" style="display:none;">AidEthos</span>
+    </a>
+    <div class="nav-links"><a href="ngo-dashboard.html">Back to Dashboard</a></div>
+    <div class="nav-right"><span style="font-size:.85rem;color:var(--gray-700);" id="nav-orgname">—</span></div>
+  </div>
+</nav>
+
+<div class="post-page">
+  <div class="container">
+    <div class="post-card fu">
+      <h2 style="margin-bottom:5px;">Post a New Crisis</h2>
+      <p style="color:var(--gray-500);margin-bottom:26px;">Describe your crisis so the AI can match the right volunteers.</p>
+
+      <div id="post-alert"></div>
+
+      <form class="post-form" id="post-form" novalidate>
+        <div class="form-group"><label class="form-label">Crisis Title *</label><input class="form-input" type="text" id="title" placeholder="e.g. Hyderabad Flood Response 2025" required/></div>
+
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Crisis Type</label>
+            <select class="form-select" id="crisis-type">
+              <option value="">Select type...</option>
+              <option value="Flood">Flood</option>
+              <option value="Earthquake">Earthquake</option>
+              <option value="Medical">Medical</option>
+              <option value="Orphanage">Orphanage / Education</option>
+              <option value="Drought">Drought</option>
+              <option value="Animal Rescue">Animal Rescue</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Location</label><input class="form-input" type="text" id="location" placeholder="Hyderabad, Telangana" value="Hyderabad, Telangana"/></div>
+        </div>
+
+        <div class="form-group"><label class="form-label">Skills Required *</label><input class="form-input" type="text" id="required-skills" placeholder="data analysts, drivers, first aid, medical..." required/><span class="form-hint">Comma-separated. The AI uses this to match volunteers.</span></div>
+
+        <div class="form-group"><label class="form-label">Description *</label><textarea class="form-textarea" id="description" rows="4" placeholder="Describe the crisis, what help is needed, and how volunteers can assist..." required></textarea></div>
+
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Contact Phone</label><input class="form-input" type="tel" id="contact-phone" placeholder="+91 40 2345 6789"/></div>
+          <div class="form-group"><label class="form-label">Contact Email</label><input class="form-input" type="email" id="contact-email" placeholder="crisis@ngo.org"/></div>
+        </div>
+
+        <div class="form-group"><label class="form-label">Deadline (optional)</label><input class="form-input" type="date" id="deadline"/></div>
+
+        <div class="form-group">
+          <label class="form-label">Urgency Level: <strong id="urgency-val" style="color:var(--red);">8 / 10 — High</strong></label>
+          <input type="range" id="urgency" min="1" max="10" value="8"/>
+          <div class="slider-labels"><span>1 — Low</span><span>5 — Medium</span><span>10 — Critical</span></div>
+          <div class="urgency-preview">
+            <div class="urgency-preview-dot" id="urgency-dot" style="background:var(--red);"></div>
+            <span id="urgency-text" style="color:var(--red);">High Urgency — Immediate Response Needed</span>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;margin-top:4px;">
+          <button type="submit" class="btn btn-teal btn-lg" id="btn-post" style="flex:1;">Post Crisis</button>
+          <a href="ngo-dashboard.html" class="btn btn-ghost btn-lg">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+<script>
+const API='http://127.0.0.1:8000';
+const ngo=JSON.parse(localStorage.getItem('aidethos_ngo')||'null');
+if (!ngo?.id) window.location.href='login.html';
+document.getElementById('nav-orgname').textContent=ngo.org_name;
+if (ngo.phone) document.getElementById('contact-phone').value=ngo.phone;
+if (ngo.email) document.getElementById('contact-email').value=ngo.email;
+document.getElementById('deadline').min=new Date().toISOString().split('T')[0];
+
+const slider=document.getElementById('urgency');
+slider.addEventListener('input',updateUrgency);
+updateUrgency();
+
+function updateUrgency(){
+  const v=parseInt(slider.value);
+  const isH=v>=8,isM=v>=5;
+  const color=isH?'var(--red)':isM?'var(--yellow)':'var(--green)';
+  const label=isH?'High Urgency — Immediate Response Needed':isM?'Medium Urgency — Response Needed Soon':'Low Urgency — Help Appreciated';
+  const lshort=isH?'High':isM?'Medium':'Low';
+  document.getElementById('urgency-val').textContent=`${v} / 10 — ${lshort}`;
+  document.getElementById('urgency-val').style.color=color;
+  document.getElementById('urgency-dot').style.background=color;
+  document.getElementById('urgency-text').textContent=label;
+  document.getElementById('urgency-text').style.color=color;
+}
+
+function showToast(msg,type='default'){
+  const c=document.getElementById('toast-container');
+  const t=document.createElement('div');t.className=`toast ${type}`;t.textContent=msg;c.appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},3500);
+}
+
+document.getElementById('post-form').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const btn=document.getElementById('btn-post');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>&nbsp;Posting crisis...';
+  document.getElementById('post-alert').innerHTML='';
+
+  const payload={
+    ngo_id:ngo.id,
+    title:document.getElementById('title').value.trim(),
+    crisis_type:document.getElementById('crisis-type').value,
+    location:document.getElementById('location').value.trim()||'Hyderabad, Telangana',
+    required_skills:document.getElementById('required-skills').value.trim(),
+    description:document.getElementById('description').value.trim(),
+    contact_phone:document.getElementById('contact-phone').value.trim(),
+    contact_email:document.getElementById('contact-email').value.trim(),
+    deadline:document.getElementById('deadline').value||null,
+    urgency_level:parseInt(slider.value)
+  };
+
+  if (!payload.title||!payload.required_skills||!payload.description){
+    document.getElementById('post-alert').innerHTML='<div class="alert alert-error">Please fill in Title, Skills, and Description.</div>';
+    btn.disabled=false;btn.textContent='Post Crisis';return;
+  }
+
+  try {
+    const res=await fetch(`${API}/crises`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const data=await res.json();
+    if (!res.ok) throw new Error(data.detail||'Failed to post crisis');
+    showToast('Crisis posted successfully!','success');
+    setTimeout(()=>window.location.href='ngo-dashboard.html',1000);
+  } catch(err){
+    document.getElementById('post-alert').innerHTML=`<div class="alert alert-error">${err.message}</div>`;
+    btn.disabled=false;btn.textContent='Post Crisis';
+  }
+});
+</script>
+</body>
+</html>

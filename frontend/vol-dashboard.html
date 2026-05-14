@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>AidEthos — Volunteer Dashboard</title>
+  <link rel="stylesheet" href="static/css/style.css"/>
+</head>
+<body>
+<nav class="navbar">
+  <div class="container">
+    <a href="index.html" class="nav-logo">
+      <img src="static/images/logo.png" alt="AidEthos" onerror="this.style.display='none';document.getElementById('lt').style.display='block'"/>
+      <span id="lt" class="nav-logo-text" style="display:none;">AidEthos</span>
+    </a>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="vol-dashboard.html" class="active">Dashboard</a>
+    </div>
+    <div class="nav-right">
+      <div class="nav-profile" id="nav-avatar">?</div>
+      <button class="btn btn-ghost btn-sm" id="btn-logout">Log Out</button>
+    </div>
+  </div>
+</nav>
+
+<div class="container vol-dash">
+  <!-- Welcome -->
+  <div class="vol-dash-welcome fu">
+    <h1>Welcome back, <span id="vol-name-display">—</span>!</h1>
+  </div>
+
+  <!-- TOP: matches + skills -->
+  <div class="vol-top-grid">
+    <!-- Left: matches -->
+    <div class="vol-matches">
+      <h3>Your Top Matches</h3>
+      <div id="matches-loader" class="loader"><div class="spinner spinner-teal"></div>&nbsp;Finding your best matches...</div>
+      <div id="matches-error" class="alert alert-error" style="display:none;"></div>
+      <div class="match-cards-grid" id="match-cards"></div>
+      <div id="matches-empty" class="empty-state" style="display:none;">
+        <h3>No matches found</h3>
+        <p>No active crises match your skills yet. Check back soon.</p>
+      </div>
+    </div>
+
+    <!-- Right: skills panel -->
+    <div class="skills-panel" id="skills-panel">
+      <h3>Your Skills</h3>
+      <div class="skills-list" id="skills-list">
+        <div class="skill-item" style="color:var(--gray-500);">Loading...</div>
+      </div>
+      <div class="skills-panel-footer">
+        <button class="btn btn-ghost btn-sm" id="btn-edit-skills">Edit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM: recent activity -->
+  <div class="vol-activity">
+    <h3>Recent Activity</h3>
+    <div class="activity-card" id="activity-card">
+      <div id="activity-loader" class="loader" style="padding:20px;"><div class="spinner spinner-teal"></div></div>
+      <div id="activity-entries"></div>
+      <div id="activity-empty" class="empty-state" style="display:none;padding:24px;">
+        <h3>No activity yet</h3>
+        <p>Your volunteer activity will appear here after you register for crises.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Skills Modal -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-head">
+      <h3>Edit Your Skills</h3>
+      <button class="modal-close" id="edit-close">x</button>
+    </div>
+    <div id="edit-alert"></div>
+    <form id="edit-form" class="modal-form" novalidate>
+      <div class="form-group">
+        <label class="form-label">Skills</label>
+        <textarea class="form-textarea" id="edit-skills" rows="4" placeholder="First Aid, Data Analysis, Teaching..."></textarea>
+        <span class="form-hint">Comma-separated. Update to improve your match quality.</span>
+      </div>
+      <button type="submit" class="btn btn-teal btn-full" id="btn-save-skills">Save Skills</button>
+    </form>
+  </div>
+</div>
+
+<!-- Contact Modal -->
+<div class="modal-overlay" id="contact-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div><h3 id="c-title">Contact NGO</h3><p style="font-size:.78rem;color:var(--gray-500);margin-top:3px;" id="c-ngo">—</p></div>
+      <button class="modal-close" id="c-close">x</button>
+    </div>
+    <div class="contact-popup" id="c-info"></div>
+    <div style="margin-top:14px;">
+      <button class="btn btn-teal btn-full" id="btn-confirm-help">Confirm — I will help</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+
+<script>
+const API='http://127.0.0.1:8000';
+let vol=JSON.parse(localStorage.getItem('aidethos_vol')||'null');
+if (!vol?.id) window.location.href='login.html';
+
+document.getElementById('vol-name-display').textContent=vol.name||'Volunteer';
+document.getElementById('nav-avatar').textContent=(vol.name||'V').slice(0,2).toUpperCase();
+
+function esc(s){const d=document.createElement('div');d.appendChild(document.createTextNode(String(s||'')));return d.innerHTML;}
+function urgencyClass(l){return l>=8?'high':l>=5?'medium':'low';}
+function urgencyLabel(l){return l>=8?'High Urgency':l>=5?'Medium Urgency':'Low Urgency';}
+function showToast(msg,type='default'){
+  const c=document.getElementById('toast-container');
+  const t=document.createElement('div');t.className=`toast ${type}`;t.textContent=msg;c.appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},3500);
+}
+
+// Render skills panel
+function renderSkills(){
+  const skills=(vol.skills||'').split(',').map(s=>s.trim()).filter(Boolean);
+  document.getElementById('skills-list').innerHTML=skills.length
+    ? skills.map(s=>`<div class="skill-item">${esc(s)}</div>`).join('')
+    : '<div class="skill-item" style="color:var(--gray-500);">No skills added yet.</div>';
+  document.getElementById('edit-skills').value=vol.skills||'';
+}
+
+// Load top matches
+async function loadMatches(){
+  document.getElementById('matches-loader').style.display='flex';
+  document.getElementById('match-cards').innerHTML='';
+  document.getElementById('matches-empty').style.display='none';
+  document.getElementById('matches-error').style.display='none';
+  try {
+    const res=await fetch(`${API}/match/volunteer/${vol.id}`);
+    const matches=await res.json();
+    document.getElementById('matches-loader').style.display='none';
+    if (!matches.length){document.getElementById('matches-empty').style.display='';return;}
+    renderMatchCards(matches.slice(0,4));
+  } catch(err){
+    document.getElementById('matches-loader').style.display='none';
+    document.getElementById('matches-error').textContent=`Could not load matches: ${err.message}`;
+    document.getElementById('matches-error').style.display='';
+  }
+}
+
+function renderMatchCards(matches){
+  document.getElementById('match-cards').innerHTML=matches.map(c=>{
+    const cls=urgencyClass(c.urgency_level);
+    const pct=c.match_score!=null?Math.round(c.match_score*100):null;
+    const tags=(c.required_skills||'').split(',').slice(0,3).map(s=>`<span class="skill-tag">${esc(s.trim())}</span>`).join('');
+    return `
+    <div class="match-card ${cls} fu">
+      <div class="mc-top">
+        <div class="mc-title-col">
+          <div class="mc-title">${esc(c.title)}</div>
+          <div class="mc-ngo">${esc(c.ngo_name)}</div>
+        </div>
+        ${pct!==null?`<span class="match-badge">${pct}% Match</span>`:''}
+      </div>
+      <div class="mc-loc"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${esc(c.location||'Hyderabad')}</div>
+      <div class="mc-skills">${tags}</div>
+      <div class="mc-contact"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>&nbsp;${esc(c.contact_email||c.ngo_name)}</div>
+      <div class="mc-desc">${esc((c.description||'').slice(0,100))}...</div>
+      <div class="mc-footer">
+        <button class="btn btn-teal btn-sm" onclick="openContact(${c.id},'${esc(c.title).replace(/'/g,"\\'")}','${esc(c.ngo_name).replace(/'/g,"\\'")}','${esc(c.contact_phone||'')}','${esc(c.contact_email||'')}')">Help now</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Load activity
+async function loadActivity(){
+  document.getElementById('activity-loader').style.display='flex';
+  try {
+    const res=await fetch(`${API}/volunteer/${vol.id}/activity`);
+    const acts=await res.json();
+    document.getElementById('activity-loader').style.display='none';
+    if (!acts.length){document.getElementById('activity-empty').style.display='';return;}
+    document.getElementById('activity-entries').innerHTML=acts.map(a=>{
+      const statusCls=a.status==='Completed'?'act-status-completed':'act-status-registered';
+      return `
+      <div class="activity-entry">
+        <div class="act-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+        <div class="act-body">
+          <div class="act-title">${esc(a.crisis_title)}</div>
+          <div class="act-row">
+            <span class="${statusCls}">${esc(a.status)}</span>
+            <span class="act-time">${esc(a.time_ago)}</span>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch {
+    document.getElementById('activity-loader').style.display='none';
+    document.getElementById('activity-empty').style.display='';
+  }
+}
+
+// Contact modal
+window.openContact=function(id,title,ngo,phone,email){
+  document.getElementById('c-title').textContent=title;
+  document.getElementById('c-ngo').textContent=ngo;
+  document.getElementById('c-info').innerHTML=`
+    <div class="contact-row"><div class="c-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div><div><div class="contact-val">${esc(ngo)}</div><div class="contact-sub">Organization</div></div></div>
+    <div class="contact-row"><div class="c-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.28h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.96a16 16 0 0 0 6 6l.66-.66a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.28 16.92z"/></svg></div><div><div class="contact-val">${esc(phone||'Contact NGO directly')}</div><div class="contact-sub">Phone</div></div></div>
+    <div class="contact-row"><div class="c-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></div><div><div class="contact-val">${esc(email||'Contact NGO directly')}</div><div class="contact-sub">Email</div></div></div>`;
+  document.getElementById('contact-modal').classList.add('open');
+  document.getElementById('btn-confirm-help').onclick=async()=>{
+    try {
+      await fetch(`${API}/volunteers/${vol.id}/register-crisis`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({crisis_id:id})});
+    } catch {}
+    document.getElementById('contact-modal').classList.remove('open');
+    showToast('You have registered to help. The NGO will contact you.','success');
+    loadActivity();
+  };
+};
+
+// Edit skills
+document.getElementById('btn-edit-skills').addEventListener('click',()=>{
+  document.getElementById('edit-skills').value=vol.skills||'';
+  document.getElementById('edit-modal').classList.add('open');
+});
+document.getElementById('edit-form').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const btn=document.getElementById('btn-save-skills');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>&nbsp;Saving...';
+  const newSkills=document.getElementById('edit-skills').value.trim();
+  try {
+    const res=await fetch(`${API}/volunteer/${vol.id}/skills`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({skills:newSkills})});
+    const data=await res.json();
+    if (!res.ok) throw new Error(data.detail);
+    vol.skills=newSkills;
+    localStorage.setItem('aidethos_vol',JSON.stringify(vol));
+    renderSkills();
+    document.getElementById('edit-modal').classList.remove('open');
+    showToast('Skills updated successfully.','success');
+    loadMatches();
+  } catch(err){document.getElementById('edit-alert').innerHTML=`<div class="alert alert-error">${err.message}</div>`;}
+  btn.disabled=false;btn.textContent='Save Skills';
+});
+
+document.getElementById('edit-close').addEventListener('click',()=>document.getElementById('edit-modal').classList.remove('open'));
+document.getElementById('c-close').addEventListener('click',()=>document.getElementById('contact-modal').classList.remove('open'));
+['edit-modal','contact-modal'].forEach(id=>{
+  document.getElementById(id).addEventListener('click',e=>{if(e.target===document.getElementById(id))document.getElementById(id).classList.remove('open');});
+});
+
+document.getElementById('btn-logout').addEventListener('click',()=>{localStorage.removeItem('aidethos_vol');window.location.href='index.html';});
+
+renderSkills();
+loadMatches();
+loadActivity();
+</script>
+</body>
+</html>

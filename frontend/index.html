@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>AidEthos — Match Your Skills to Urgent Crises</title>
+  <link rel="stylesheet" href="static/css/style.css"/>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="container">
+    <a href="index.html" class="nav-logo">
+      <img src="static/images/logo.png" alt="AidEthos" onerror="this.style.display='none';document.getElementById('lt').style.display='block'"/>
+      <span id="lt" class="nav-logo-text" style="display:none;">AidEthos</span>
+    </a>
+    <div class="nav-links">
+      <a href="index.html" class="active">Home</a>
+      <a href="login.html">NGO Login</a>
+    </div>
+    <div class="nav-right">
+      <a href="login.html" class="btn btn-outline btn-sm">Log In</a>
+      <a href="signup.html" class="btn btn-teal btn-sm">Sign Up</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <img class="hero-bg" src="static/images/hero.jpg" alt="Volunteers working together"/>
+  <div class="hero-content fu">
+    <h1>Match Your Skills to<br/>Urgent Crises</h1>
+    <p>Connect with NGOs that need your expertise — powered by AI matching.</p>
+    <div class="hero-btns">
+      <button class="hero-btn-white" onclick="document.getElementById('crises-section').scrollIntoView({behavior:'smooth'});document.getElementById('skills-input').focus();">
+        Find My Matches
+      </button>
+      <a href="signup.html?role=ngo" class="hero-btn-outline">Register NGO</a>
+    </div>
+  </div>
+</section>
+
+<!-- ACTIVE CRISES -->
+<section class="crises-section" id="crises-section">
+  <div class="container">
+    <div class="crises-head fu">
+      <h2>Active Crises</h2>
+      <h3>Find matching Crises</h3>
+      <p>Enter your skills to find causes that you can help the most.</p>
+    </div>
+
+    <div class="search-filter-row fu d1">
+      <div class="search-wrap" style="flex:1;">
+        <svg class="search-icon-left" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" class="form-input search-input-field" id="skills-input" placeholder="Ex: First Aid, Data Analytics, Driving..."/>
+      </div>
+      <select class="filter-select" id="urgency-filter">
+        <option value="">All Urgency Levels</option>
+        <option value="high">High Urgency</option>
+        <option value="medium">Medium Urgency</option>
+        <option value="low">Low Urgency</option>
+      </select>
+      <button class="btn btn-teal" id="btn-search">Search</button>
+      <a href="signup.html?role=volunteer" class="btn btn-teal-outline">Save My Profile</a>
+    </div>
+    <p class="search-helper">Press Enter or click Search to find matching crises.</p>
+
+    <span id="showing-label" class="showing-label" style="display:none;"></span>
+
+    <div id="crises-loader" class="loader" style="display:none;"><div class="spinner spinner-teal"></div>&nbsp;Finding matches...</div>
+    <div id="crises-error" class="alert alert-error" style="display:none;"></div>
+    <div class="crisis-grid" id="crisis-grid"></div>
+    <div id="crises-empty" class="empty-state" style="display:none;">
+      <h3>No crises found</h3>
+      <p>Try different skills or remove the urgency filter.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Contact Modal -->
+<div class="modal-overlay" id="contact-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <h3 id="modal-crisis-title">Contact NGO</h3>
+        <p style="font-size:.78rem;color:var(--gray-500);margin-top:3px;" id="modal-ngo-name">—</p>
+      </div>
+      <button class="modal-close" id="modal-close">x</button>
+    </div>
+    <div class="contact-popup" id="contact-info"></div>
+    <div style="margin-top:14px;">
+      <button class="btn btn-teal btn-full" id="btn-help-now">Register to Help</button>
+    </div>
+  </div>
+</div>
+
+<!-- Volunteer register Modal -->
+<div class="modal-overlay" id="vol-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div><h3>Register as Volunteer</h3><p style="font-size:.78rem;color:var(--gray-500);margin-top:3px;">Save your details to receive updates</p></div>
+      <button class="modal-close" id="vol-close">x</button>
+    </div>
+    <div id="vol-alert"></div>
+    <form class="modal-form" id="vol-form" novalidate>
+      <div class="form-group"><label class="form-label">Full Name</label><input class="form-input" type="text" id="vr-name" placeholder="Your full name" required/></div>
+      <div class="form-group"><label class="form-label">Phone Number</label><input class="form-input" type="tel" id="vr-phone" placeholder="+91 98765 43210"/></div>
+      <div class="form-group"><label class="form-label">Skills</label><textarea class="form-textarea" id="vr-skills" rows="2" placeholder="First Aid, Data Analysis, Teaching..." required></textarea><span class="form-hint">Comma-separated for best matching.</span></div>
+      <button type="submit" class="btn btn-teal btn-full" id="btn-vol-reg">Register as Volunteer</button>
+    </form>
+  </div>
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+
+<script>
+const API = 'http://127.0.0.1:8000';
+let allCrises = [];
+let registerCrisisId = null;
+
+function urgencyClass(l){ return l>=8?'high':l>=5?'medium':'low'; }
+function urgencyLabel(l){ return l>=8?'High Urgency':l>=5?'Medium Urgency':'Low Urgency'; }
+function credLabel(s){ const n=parseFloat(s||5); return n.toFixed(1)+'/10'; }
+function esc(s){ const d=document.createElement('div'); d.appendChild(document.createTextNode(String(s||''))); return d.innerHTML; }
+
+function showToast(msg, type='default'){
+  const c=document.getElementById('toast-container');
+  const t=document.createElement('div'); t.className=`toast ${type}`; t.textContent=msg; c.appendChild(t);
+  setTimeout(()=>{ t.style.opacity='0'; t.style.transition='opacity .3s'; setTimeout(()=>t.remove(),300); },3500);
+}
+
+function renderCrises(crises){
+  const grid  = document.getElementById('crisis-grid');
+  const empty = document.getElementById('crises-empty');
+  if (!crises||!crises.length){ grid.innerHTML=''; empty.style.display=''; return; }
+  empty.style.display='none';
+  grid.innerHTML = crises.map(c => {
+    const cls   = urgencyClass(c.urgency_level);
+    const ulbl  = urgencyLabel(c.urgency_level);
+    const tags  = (c.required_skills||'').split(',').map(s=>`<span class="skill-tag">${esc(s.trim())}</span>`).join('');
+    const matchBadge = c.match_score!=null
+      ? `<span class="match-badge">${Math.round(c.match_score*100)}% Match</span>` : '';
+    const volCount = c.volunteer_count!=null
+      ? `<span class="cc-vol-count"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> ${c.volunteer_count} volunteer${c.volunteer_count!==1?'s':''}</span>` : '';
+    return `
+    <div class="crisis-card urgency-${cls} fu">
+      <div class="cc-top">
+        <div class="cc-title-col">
+          <div class="cc-title">${esc(c.title)}</div>
+          <div class="cc-ngo">${esc(c.ngo_name)}</div>
+        </div>
+        <div class="cc-right">
+          <span class="urgency-badge ${cls}">${ulbl}</span>
+          ${matchBadge}
+        </div>
+      </div>
+      <div class="cc-loc">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        ${esc(c.location||'Hyderabad, Telangana')}
+      </div>
+      <div class="cc-skills-label">Volunteer skills needed</div>
+      <div class="cc-skills">${tags}</div>
+      <div class="cc-contact">
+        <span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.28h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.96a16 16 0 0 0 6 6l.66-.66a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.28 16.92z"/></svg>${esc(c.contact_phone||'Contact NGO')}</span>
+        <span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>${esc(c.contact_email||'Contact NGO')}</span>
+      </div>
+      <div class="cc-desc">${esc((c.description||'').slice(0,140))}${(c.description||'').length>140?'...':''}</div>
+      <div class="cc-footer">
+        <div class="cc-footer-left">
+          ${volCount}
+          <span class="credibility">Credibility: ${credLabel(c.credibility_score)}</span>
+        </div>
+        <button class="btn btn-teal btn-sm" onclick="openContact(${c.id},'${esc(c.title).replace(/'/g,"\\'")}','${esc(c.ngo_name).replace(/'/g,"\\'")}','${esc(c.contact_phone||'')}','${esc(c.contact_email||'')}')">Help now</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function loadCrises(){
+  document.getElementById('crises-loader').style.display='flex';
+  try {
+    const res = await fetch(`${API}/crises`);
+    allCrises = await res.json();
+    applyFilters();
+    document.getElementById('showing-label').textContent=`Showing ${allCrises.length} active crises`;
+    document.getElementById('showing-label').style.display='block';
+  } catch {
+    document.getElementById('crises-error').textContent='Cannot connect to backend. Make sure uvicorn is running on port 8000.';
+    document.getElementById('crises-error').style.display='';
+  } finally {
+    document.getElementById('crises-loader').style.display='none';
+  }
+}
+
+function applyFilters(){
+  const skills = document.getElementById('skills-input').value.trim().toLowerCase();
+  const urgency = document.getElementById('urgency-filter').value;
+  let filtered = [...allCrises];
+  if (urgency) filtered = filtered.filter(c => urgencyClass(c.urgency_level)===urgency);
+  document.getElementById('showing-label').style.display='block';
+  if (!skills){ renderCrises(filtered); document.getElementById('showing-label').textContent=`Showing ${filtered.length} active crises`; return; }
+  doSkillSearch(skills, filtered);
+}
+
+async function doSkillSearch(skills, base){
+  document.getElementById('crises-loader').style.display='flex';
+  try {
+    const res  = await fetch(`${API}/match/volunteer`,{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({skills}) });
+    let matched = await res.json();
+    const urgency = document.getElementById('urgency-filter').value;
+    if (urgency) matched = matched.filter(c=>urgencyClass(c.urgency_level)===urgency);
+    renderCrises(matched);
+    document.getElementById('showing-label').textContent=`Showing ${matched.length} matches for "${skills}"`;
+  } catch(e) {
+    document.getElementById('crises-error').textContent=`Error: ${e.message}`;
+    document.getElementById('crises-error').style.display='';
+  } finally {
+    document.getElementById('crises-loader').style.display='none';
+  }
+}
+
+document.getElementById('btn-search').addEventListener('click', applyFilters);
+document.getElementById('skills-input').addEventListener('keydown', e=>{ if(e.key==='Enter') applyFilters(); });
+document.getElementById('urgency-filter').addEventListener('change', applyFilters);
+
+// Contact modal
+window.openContact = function(id,title,ngo,phone,email){
+  document.getElementById('modal-crisis-title').textContent=title;
+  document.getElementById('modal-ngo-name').textContent=ngo;
+  document.getElementById('contact-info').innerHTML=`
+    <div class="contact-row"><div class="c-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div><div><div class="contact-val">${esc(ngo)}</div><div class="contact-sub">Organization</div></div></div>
+    <div class="contact-row"><div class="c-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.28h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.96a16 16 0 0 0 6 6l.66-.66a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.28 16.92z"/></svg></div><div><div class="contact-val">${esc(phone||'Contact NGO directly')}</div><div class="contact-sub">Phone</div></div></div>
+    <div class="contact-row"><div class="c-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></div><div><div class="contact-val">${esc(email||'Contact NGO directly')}</div><div class="contact-sub">Email</div></div></div>`;
+  document.getElementById('contact-modal').classList.add('open');
+  registerCrisisId = id;
+  document.getElementById('btn-help-now').onclick=()=>{
+    document.getElementById('contact-modal').classList.remove('open');
+    document.getElementById('vol-modal').classList.add('open');
+  };
+};
+
+document.getElementById('modal-close').addEventListener('click',()=>document.getElementById('contact-modal').classList.remove('open'));
+document.getElementById('vol-close').addEventListener('click',()=>document.getElementById('vol-modal').classList.remove('open'));
+['contact-modal','vol-modal'].forEach(id=>{
+  document.getElementById(id).addEventListener('click',e=>{ if(e.target===document.getElementById(id)) document.getElementById(id).classList.remove('open'); });
+});
+
+document.getElementById('vol-form').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const btn=document.getElementById('btn-vol-reg');
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span>&nbsp;Registering...';
+  document.getElementById('vol-alert').innerHTML='';
+  const payload={name:document.getElementById('vr-name').value.trim(),phone:document.getElementById('vr-phone').value.trim(),skills:document.getElementById('vr-skills').value.trim(),crisis_id:registerCrisisId};
+  if (!payload.name||!payload.skills){document.getElementById('vol-alert').innerHTML='<div class="alert alert-error">Please enter your name and skills.</div>';btn.disabled=false;btn.textContent='Register as Volunteer';return;}
+  try {
+    const res=await fetch(`${API}/volunteers`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    if (!res.ok) throw new Error((await res.json()).detail||'Registration failed');
+    document.getElementById('vol-modal').classList.remove('open');
+    document.getElementById('vol-form').reset();
+    showToast('Registered successfully! The NGO will contact you.','success');
+  } catch(err){
+    document.getElementById('vol-alert').innerHTML=`<div class="alert alert-error">${err.message}</div>`;
+  }
+  btn.disabled=false; btn.textContent='Register as Volunteer';
+});
+
+loadCrises();
+</script>
+</body>
+</html>
